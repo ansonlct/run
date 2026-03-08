@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Apple Fitness 跑步追蹤器 (拉桿結束版)</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        /* iOS 系統字體與純黑背景 */
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; background-color: #000000; color: #ffffff; }
+        
+        #active-run-view { display: flex; flex-direction: column; height: 100%; width: 100%; }
+        #summary-view, #history-view { display: none; flex-direction: column; height: 100%; width: 100%; background-color: #000; padding: 20px; box-sizing: border-box; overflow-y: auto; z-index: 2000; position: absolute; top: 0; left: 0; }
+
+        /* 頂部導覽列 */
+        #top-nav { display: flex; justify-content: space-between; padding: 15px 20px 0 20px; align-items: center; z-index: 1000; }
+        .app-title { font-size: 22px; font-weight: bold; color: white; }
+        #openHistoryBtn { color: #32ade6; font-size: 16px; font-weight: 600; cursor: pointer; }
+
+        /* 1. 地圖卡片區塊 */
+        #map-container { position: relative; height: 32vh; margin: 15px 15px 5px 15px; border-radius: 20px; overflow: hidden; background-color: #1c1c1e; }
+        #map { width: 100%; height: 100%; }
+        .map-overlay { position: absolute; bottom: 15px; z-index: 1000; font-size: 32px; font-weight: 800; text-shadow: 0 2px 5px rgba(0,0,0,0.6); pointer-events: none; }
+        #val-time { left: 15px; color: #ffe620; font-variant-numeric: tabular-nums; } 
+        #val-dist { right: 15px; color: #32ade6; } 
+        #centerMapBtn { position: absolute; top: 15px; right: 15px; z-index: 1000; background-color: rgba(28, 28, 30, 0.8); backdrop-filter: blur(5px); border-radius: 50%; width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; color: #32ade6; font-size: 20px; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); display: none; }
+
+        /* 2. 數據與圖表區塊 */
+        .fitness-section { padding: 10px 20px; border-bottom: 1px solid #1c1c1e; }
+        .section-header { margin-bottom: 5px; }
+        .section-title { font-size: 16px; font-weight: 600; margin-bottom: 2px; }
+        .section-subtitle { font-size: 13px; font-weight: 500; color: #32d7cb; }
+        .chart-wrapper { position: relative; height: 70px; width: 100%; margin-top: 5px; }
+
+        /* 六宮格數據面板 */
+        .stats-grid-6 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center; margin-bottom: 10px; }
+        .stat-mini-box { background: rgba(255,255,255,0.05); padding: 8px 5px; border-radius: 10px; }
+        .stat-mini-label { font-size: 10px; color: #8e8e93; text-transform: uppercase; margin-bottom: 2px; }
+        .stat-mini-value { font-size: 16px; font-weight: bold; }
+        .val-highlight { color: #32d7cb; }
+
+        /* 分段列表 */
+        #splits-list { max-height: 10vh; overflow-y: auto; font-size: 14px; }
+        .split-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1c1c1e; }
+        .split-row span:last-child { color: #32d7cb; font-weight: 600; }
+
+        /* 🌟 3. 控制按鈕 (改為滿版直排堆疊) */
+        #controls { padding: 10px 20px; padding-bottom: 30px; display: flex; flex-direction: column; gap: 15px; align-items: center; background: linear-gradient(transparent, rgba(0,0,0,0.9) 20%); }
+        button { padding: 16px; font-size: 18px; border: none; border-radius: 28px; color: white; font-weight: 600; cursor: pointer; width: 100%; }
+        #startBtn { background-color: #34c759; } 
+        #pauseBtn { background-color: #ff9500; display: none; }
+
+        /* 🌟 專屬 Slide-to-Stop 拉桿樣式 */
+        #stopSliderTrack {
+            position: relative;
+            width: 100%;
+            height: 56px;
+            background-color: #2c2c2e;
+            border-radius: 28px;
+            display: none; /* 預設隱藏 */
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border: 1px solid #3a3a3c;
+        }
+        #stopSliderText {
+            color: #8e8e93;
+            font-size: 16px;
+            font-weight: 600;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+        #stopSliderHandle {
+            position: absolute;
+            left: 4px;
+            top: 4px;
+            width: 48px;
+            height: 48px;
+            border-radius: 24px;
+            background-color: #ff3b30; /* iOS 紅色 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: grab;
+            touch-action: none; /* 防止滑動時觸發網頁捲動 */
+            transition: transform 0.3s ease-out; /* 回彈動畫 */
+        }
+        /* 拉桿箭頭圖示 */
+        #stopSliderHandle::after {
+            content: '';
+            width: 10px;
+            height: 10px;
+            border-top: 3px solid white;
+            border-right: 3px solid white;
+            transform: rotate(45deg);
+            margin-left: -3px;
+        }
+
+        /* GPS 指針 */
+        .gps-indicator-wrapper { position: relative; width: 20px; height: 20px; pointer-events: none; }
+        .gps-dot { width: 12px; height: 12px; background-color: #0a84ff; border: 3px solid white; border-radius: 50%; position: absolute; top: 4px; left: 4px; box-shadow: 0 0 5px rgba(0,0,0,0.5); z-index: 10; }
+        .gps-pulse { width: 20px; height: 20px; border-radius: 50%; position: absolute; top: 0; left: 0; background-color: rgba(10, 132, 255, 0.4); animation: gps-pulse-animation 2s ease-out infinite; }
+        @keyframes gps-pulse-animation { 0% { transform: scale(0.6); opacity: 1; } 100% { transform: scale(2.8); opacity: 0; } }
+
+        /* 總結與歷史畫面 */
+        .summary-title { font-size: 28px; font-weight: bold; text-align: center; margin-top: 20px; margin-bottom: 5px; }
+        .summary-date { text-align: center; color: #8e8e93; font-size: 16px; margin-bottom: 20px; font-weight: 500;}
+        .summary-card, .history-card { background-color: #1c1c1e; border-radius: 16px; padding: 20px; margin-bottom: 15px; }
+        .summary-grid, .history-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .summary-item { display: flex; flex-direction: column; }
+        .summary-item-label { color: #8e8e93; font-size: 12px; text-transform: uppercase; margin-bottom: 4px; }
+        .summary-item-value { font-size: 20px; font-weight: bold; color: white; }
+        .summary-item-value.blue { color: #32ade6; }
+        .summary-item-value.yellow { color: #ffe620; }
+        .summary-item-value.green { color: #34c759; }
+        .summary-item-value.orange { color: #ff9500; }
+        #doneBtn { background-color: #2c2c2e; width: 100%; margin-top: 10px; color: #32ade6; border-radius: 14px;} 
+
+        .history-header { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; margin-bottom: 25px; }
+        .history-card { padding: 15px; display: flex; flex-direction: column; gap: 10px; }
+        .history-date-row { color: #8e8e93; font-size: 14px; border-bottom: 1px solid #333; padding-bottom: 8px; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+
+    <div id="active-run-view">
+        <div id="top-nav">
+            <div class="app-title">跑步追蹤</div>
+            <div id="openHistoryBtn">歷史紀錄</div>
+        </div>
+
+        <div id="map-container">
+            <div id="map"></div>
+            <div id="centerMapBtn">⌖</div>
+            <div class="map-overlay" id="val-time">00:00.00</div>
+            <div class="map-overlay" id="val-dist">0.00KM</div>
+        </div>
+
+        <div class="fitness-section" style="padding-top: 5px; padding-bottom: 5px;">
+            <div class="stats-grid-6">
+                <div class="stat-mini-box"><div class="stat-mini-label">即時配速</div><div class="stat-mini-value val-highlight" id="val-current-pace">--:--</div></div>
+                <div class="stat-mini-box"><div class="stat-mini-label">平均配速</div><div class="stat-mini-value" id="val-pace">--:--</div></div>
+                <div class="stat-mini-box"><div class="stat-mini-label">大卡</div><div class="stat-mini-value" style="color: #ff9500;" id="val-cal">0</div></div>
+            </div>
+        </div>
+
+        <div class="fitness-section">
+            <div class="section-header">
+                <div class="section-title">配速圖表 Pace</div>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="paceChart"></canvas>
+            </div>
+        </div>
+
+        <div class="fitness-section" style="flex-grow: 1; border-bottom: none;">
+            <div class="section-header" style="display: flex; justify-content: space-between;">
+                <div class="section-title">分段 Splits</div>
+                <div style="text-align: right;"><span class="section-title" style="font-size: 12px; color: #8e8e93;">總爬升</span> <span style="color: #34c759; font-weight: bold;" id="val-elev">0m</span></div>
+            </div>
+            <div id="splits-list">
+                <div style="color: #8e8e93; font-size: 12px; text-align: center; margin-top: 10px;">跑到 1km 後顯示分段紀錄</div>
+            </div>
+        </div>
+
+        <div id="controls">
+            <button id="startBtn">開始跑步</button>
+            <button id="pauseBtn">暫停</button>
+            
+            <div id="stopSliderTrack">
+                <span id="stopSliderText">滑動來結束</span>
+                <div id="stopSliderHandle"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="summary-view">
+        <div class="summary-title">體能訓練總結</div>
+        <div class="summary-date" id="sum-date"></div>
+
+        <div class="summary-card">
+            <div class="summary-grid">
+                <div class="summary-item" style="grid-column: span 2;">
+                    <div class="summary-item-label">總距離</div>
+                    <div class="summary-item-value blue" style="font-size: 42px;" id="sum-dist">0.00 KM</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-item-label">總時間</div>
+                    <div class="summary-item-value yellow" id="sum-time">00:00.00</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-item-label">活動大卡</div>
+                    <div class="summary-item-value orange" id="sum-cal">0 KCAL</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-item-label">平均配速</div>
+                    <div class="summary-item-value" id="sum-pace">--:-- /KM</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-item-label">總爬升</div>
+                    <div class="summary-item-value green" id="sum-elev">0 m</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-item-label">開始時間</div>
+                    <div class="summary-item-value" id="sum-start-time" style="font-size: 16px;">--:--</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-item-label">結束時間</div>
+                    <div class="summary-item-value" id="sum-end-time" style="font-size: 16px;">--:--</div>
+                </div>
+            </div>
+        </div>
+        <div style="text-align: center; color: #34c759; font-size: 14px; font-weight: 500;">紀錄已安全儲存 ✓</div>
+        <button id="doneBtn">完成</button>
+    </div>
+
+    <div id="history-view">
+        <div class="history-header">
+            <div class="summary-title" style="margin: 0;">歷史紀錄</div>
+            <div id="closeHistoryBtn" style="color: #32ade6; font-size: 16px; font-weight: 600; cursor: pointer;">完成</div>
+        </div>
+        <div id="history-list-container"></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script>
+        let map, marker, pathLine, watchId = null, timerInterval = null;
+        let pathCoordinates = [], totalDistance = 0, totalElevationGain = 0, lastAltitude = null, totalCalories = 0;
+        let isPaused = false, accumulatedTime = 0, currentStartTime = null;
+        let nextKmMarker = 1, lastKmSplitSeconds = 0, lastKmDistance = 0;
+        
+        let runStartTimeString = "--:--"; let runEndTimeString = "--:--";
+        let paceChart = null, lastChartDistance = 0, lastChartSeconds = 0;
+        let recentPointsForPace = []; 
+        let wakeLock = null; let isMapFollowing = true; 
+
+        const domDist = document.getElementById('val-dist');
+        const domTime = document.getElementById('val-time');
+        const domPace = document.getElementById('val-pace');
+        const domCurrentPace = document.getElementById('val-current-pace'); 
+        const domElev = document.getElementById('val-elev');
+        const domCal = document.getElementById('val-cal');
+        const centerMapBtn = document.getElementById('centerMapBtn');
+        const splitsList = document.getElementById('splits-list');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const stopSliderTrack = document.getElementById('stopSliderTrack');
+        const openHistoryBtn = document.getElementById('openHistoryBtn');
+
+        const modernGpsIcon = L.divIcon({ className: 'gps-indicator-wrapper', html: '<div class="gps-pulse"></div><div class="gps-dot"></div>', iconSize: [20, 20], iconAnchor: [10, 10] });
+
+        // Wake Lock API
+        async function requestWakeLock() { try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {} }
+        function releaseWakeLock() { if (wakeLock !== null) wakeLock.release().then(() => wakeLock = null); }
+        document.addEventListener('visibilitychange', async () => { if (wakeLock !== null && document.visibilityState === 'visible') await requestWakeLock(); });
+
+        // Chart.js 初始化
+        function initChart() {
+            const ctx = document.getElementById('paceChart').getContext('2d');
+            Chart.defaults.color = '#8e8e93'; Chart.defaults.font.family = '-apple-system, sans-serif';
+            const initialLabels = Array.from({length: 50}, (_, i) => ((i+1)*0.1).toFixed(1));
+            paceChart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: initialLabels, datasets: [{ label: '配速', data: [], backgroundColor: '#32d7cb', borderRadius: 2, barThickness: 3 }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false, animation: { duration: 0 },
+                    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                    scales: { x: { grid: { display: false, drawBorder: false }, ticks: { maxTicksLimit: 6, font: { size: 10 }, callback: (val, idx) => Number.isInteger((idx + 1) * 0.1) ? ((idx + 1) * 0.1) + 'k' : '' } }, y: { display: false, beginAtZero: true } }
+                }
+            });
+        }
+
+        // Leaflet 地圖初始化
+        function initMap() {
+            map = L.map('map', {zoomControl: false, attributionControl: false}).setView([25.033, 121.564], 15);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+            pathLine = L.polyline([], {color: '#0a84ff', weight: 5, opacity: 0.9}).addTo(map);
+            initChart(); 
+            if (navigator.geolocation) navigator.geolocation.getCurrentPosition(pos => { const { latitude: lat, longitude: lng } = pos.coords; map.setView([lat, lng], 17); marker = L.marker([lat, lng], {icon: modernGpsIcon}).addTo(map); }, err => {}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+
+            map.on('dragstart', () => { isMapFollowing = false; if (watchId !== null) centerMapBtn.style.display = 'flex'; });
+            centerMapBtn.addEventListener('click', () => { isMapFollowing = true; centerMapBtn.style.display = 'none'; if (pathCoordinates.length > 0) map.panTo(pathCoordinates[pathCoordinates.length - 1]); });
+        }
+
+        // 數學與時間處理
+        function calculateDistance(lat1, lon1, lat2, lon2) { const R = 6371; const dLat = (lat2 - lat1) * Math.PI / 180; const dLon = (lon2 - lon1) * Math.PI / 180; const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2); return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); }
+        function formatTime(totalSeconds) { const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0'); const s = (totalSeconds % 60).toString().padStart(2, '0'); return `${m}:${s}`; }
+        function formatTimeWithMs(totalMs) { const totalSeconds = Math.floor(totalMs / 1000); const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0'); const s = (totalSeconds % 60).toString().padStart(2, '0'); const cs = Math.floor((totalMs % 1000) / 10).toString().padStart(2, '0'); return `${m}:${s}.${cs}`; }
+        function getElapsedTime() { return (!currentStartTime || isPaused) ? accumulatedTime : accumulatedTime + (Date.now() - currentStartTime); }
+
+        function updateTimerAndPace() {
+            const totalMs = getElapsedTime(); domTime.innerText = formatTimeWithMs(totalMs);
+            if (totalDistance > 0) domPace.innerText = formatTime(Math.floor(Math.floor(totalMs / 1000) / totalDistance));
+        }
+
+        function checkAndRecordSplit(elapsedSeconds) {
+            if (totalDistance >= nextKmMarker) {
+                if(nextKmMarker === 1) splitsList.innerHTML = ''; 
+                const splitTimeSeconds = elapsedSeconds - lastKmSplitSeconds;
+                const splitRow = document.createElement('div'); splitRow.className = 'split-row';
+                splitRow.innerHTML = `<span>${nextKmMarker} KM</span><span>${formatTime(splitTimeSeconds)}</span><span>${formatTime(Math.floor(splitTimeSeconds / (totalDistance - lastKmDistance)))} /KM</span>`;
+                splitsList.prepend(splitRow);
+                nextKmMarker++; lastKmSplitSeconds = elapsedSeconds; lastKmDistance = totalDistance;
+            }
+        }
+
+        function updateChartData(elapsedSeconds) {
+            if (totalDistance - lastChartDistance >= 0.1) {
+                let chartPace = Math.floor((elapsedSeconds - lastChartSeconds) / (totalDistance - lastChartDistance));
+                if (chartPace > 1200) chartPace = 1200; 
+                if (paceChart.data.datasets[0].data.length >= paceChart.data.labels.length) paceChart.data.labels.push((totalDistance).toFixed(1));
+                paceChart.data.datasets[0].data.push(chartPace / 60); paceChart.update();
+                lastChartDistance = totalDistance; lastChartSeconds = elapsedSeconds;
+            }
+        }
+
+        function calculateCurrentPace(lat, lng, elapsedSeconds) {
+            recentPointsForPace.push({ lat: lat, lng: lng, time: elapsedSeconds });
+            recentPointsForPace = recentPointsForPace.filter(p => elapsedSeconds - p.time <= 10);
+            if (recentPointsForPace.length >= 2) {
+                const dTime = recentPointsForPace[recentPointsForPace.length - 1].time - recentPointsForPace[0].time; 
+                const dDist = calculateDistance(recentPointsForPace[0].lat, recentPointsForPace[0].lng, lat, lng); 
+                if (dDist > 0.005 && dTime > 0) domCurrentPace.innerText = formatTime(Math.min(Math.floor(dTime / dDist), 1800));
+            }
+        }
+
+        function successLocation(position) {
+            if (isPaused) return;
+            const { latitude: lat, longitude: lng, altitude, accuracy } = position.coords;
+            if (accuracy > 40) return; // 防飄移
+
+            if (!marker) { marker = L.marker([lat, lng], {icon: modernGpsIcon}).addTo(map); map.setView([lat, lng], 17); } 
+            else { marker.setLatLng([lat, lng]); if (isMapFollowing) map.panTo([lat, lng]); }
+
+            const elapsedSeconds = Math.floor(getElapsedTime() / 1000);
+            calculateCurrentPace(lat, lng, elapsedSeconds);
+
+            if (pathCoordinates.length > 0) {
+                const distance = calculateDistance(pathCoordinates[pathCoordinates.length - 1][0], pathCoordinates[pathCoordinates.length - 1][1], lat, lng);
+                if (distance > 0.002) { 
+                    totalDistance += distance;
+                    totalCalories = Math.round(65 * totalDistance * 1.036);
+                    domDist.innerText = totalDistance.toFixed(2) + 'KM'; domCal.innerText = totalCalories;
+                    checkAndRecordSplit(elapsedSeconds); updateChartData(elapsedSeconds);     
+                }
+            }
+            if (altitude !== null) {
+                if (lastAltitude !== null) { const elevDiff = altitude - lastAltitude; if (elevDiff > 1) { totalElevationGain += elevDiff; domElev.innerText = Math.round(totalElevationGain) + 'm'; } }
+                lastAltitude = altitude;
+            }
+            pathCoordinates.push([lat, lng]); pathLine.setLatLngs(pathCoordinates);
+        }
+
+        // --- 🌟 滑動拉桿 (Slide to Stop) JS 邏輯 ---
+        const handle = document.getElementById('stopSliderHandle');
+        const track = document.getElementById('stopSliderTrack');
+        const sliderText = document.getElementById('stopSliderText');
+        let isDragging = false;
+        let startX = 0;
+        let currentX = 0;
+
+        handle.addEventListener('pointerdown', (e) => {
+            isDragging = true;
+            startX = e.clientX - currentX;
+            handle.style.transition = 'none'; // 移除回彈動畫
+        });
+
+        window.addEventListener('pointermove', (e) => {
+            if (!isDragging) return;
+            currentX = e.clientX - startX;
+            
+            // 限制拖拉範圍
+            let maxDrag = track.clientWidth - handle.clientWidth - 8;
+            if (currentX < 0) currentX = 0;
+            if (currentX > maxDrag) currentX = maxDrag;
+            
+            handle.style.transform = `translateX(${currentX}px)`;
+            sliderText.style.opacity = 1 - (currentX / maxDrag); // 文字漸漸變透明
+        });
+
+        window.addEventListener('pointerup', () => {
+            if (!isDragging) return;
+            isDragging = false;
+            let maxDrag = track.clientWidth - handle.clientWidth - 8;
+            
+            // 如果拉超過 85%，則觸發結束
+            if (currentX > maxDrag * 0.85) {
+                handle.style.transform = `translateX(${maxDrag}px)`;
+                triggerStop();
+                setTimeout(() => resetSlider(), 300); // 重置拉桿狀態以便下次使用
+            } else {
+                resetSlider(); // 沒拉到底，回彈
+            }
+        });
+
+        window.addEventListener('pointercancel', () => { if(isDragging) resetSlider(); });
+
+        function resetSlider() {
+            isDragging = false;
+            currentX = 0;
+            handle.style.transition = 'transform 0.3s ease-out';
+            handle.style.transform = 'translateX(0px)';
+            sliderText.style.opacity = 1;
+        }
+
+        // --- 流程控制 ---
+        startBtn.addEventListener('click', () => {
+            if (!navigator.geolocation) return alert('不支援 GPS！');
+            requestWakeLock(); openHistoryBtn.style.display = 'none'; isMapFollowing = true; centerMapBtn.style.display = 'none';
+            runStartTimeString = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+
+            pathCoordinates = []; totalDistance = totalElevationGain = accumulatedTime = totalCalories = 0; lastAltitude = null; isPaused = false;
+            nextKmMarker = 1; lastKmSplitSeconds = 0; lastKmDistance = 0; splitsList.innerHTML = '<div style="color: #8e8e93; font-size: 12px; text-align: center; margin-top: 10px;">跑到 1km 後顯示分段紀錄</div>'; 
+            recentPointsForPace = []; domCurrentPace.innerText = '--:--';
+            lastChartDistance = 0; lastChartSeconds = 0; paceChart.data.datasets[0].data = []; paceChart.update();
+            
+            currentStartTime = Date.now();
+            domDist.innerText = '0.00KM'; domTime.innerText = '00:00.00'; domPace.innerText = '--:--'; domElev.innerText = '0m'; domCal.innerText = '0';
+            if (pathLine) pathLine.setLatLngs([]);
+            
+            // 🌟 改變按鈕顯示狀態：顯示暫停 與 滑動結束拉桿
+            startBtn.style.display = 'none'; 
+            pauseBtn.style.display = 'block'; 
+            stopSliderTrack.style.display = 'flex';
+            pauseBtn.innerText = '暫停'; pauseBtn.style.backgroundColor = '#ff9500';
+            
+            timerInterval = setInterval(updateTimerAndPace, 30);
+            watchId = navigator.geolocation.watchPosition(successLocation, err=>{}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+        });
+
+        pauseBtn.addEventListener('click', () => {
+            if (!isPaused) {
+                isPaused = true; accumulatedTime += (Date.now() - currentStartTime); 
+                pauseBtn.innerText = '繼續'; pauseBtn.style.backgroundColor = '#34c759'; releaseWakeLock();
+            } else {
+                isPaused = false; currentStartTime = Date.now(); recentPointsForPace = []; 
+                pauseBtn.innerText = '暫停'; pauseBtn.style.backgroundColor = '#ff9500'; requestWakeLock();
+            }
+        });
+
+        function triggerStop() {
+            if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+            if (timerInterval !== null) clearInterval(timerInterval);
+            watchId = timerInterval = null; isPaused = false;
+            releaseWakeLock(); centerMapBtn.style.display = 'none';
+
+            runEndTimeString = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+
+            const finalDist = totalDistance.toFixed(2);
+            const finalTime = formatTimeWithMs(getElapsedTime()).slice(0, 5);
+            const finalAvgPace = domPace.innerText;
+            
+            if (totalDistance > 0) {
+                let history = JSON.parse(localStorage.getItem('ios_run_history') || '[]');
+                history.unshift({ id: Date.now(), date: new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' }), startTime: runStartTimeString, endTime: runEndTimeString, distance: finalDist, time: finalTime, pace: finalAvgPace, elevation: Math.round(totalElevationGain), calories: totalCalories });
+                localStorage.setItem('ios_run_history', JSON.stringify(history));
+            }
+
+            document.getElementById('sum-date').innerText = new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
+            document.getElementById('sum-dist').innerText = `${finalDist} KM`; document.getElementById('sum-time').innerText = domTime.innerText;
+            document.getElementById('sum-pace').innerText = `${finalAvgPace} /KM`; document.getElementById('sum-elev').innerText = `${Math.round(totalElevationGain)} m`;
+            document.getElementById('sum-cal').innerText = `${totalCalories} KCAL`; document.getElementById('sum-start-time').innerText = runStartTimeString; document.getElementById('sum-end-time').innerText = runEndTimeString;
+
+            document.getElementById('active-run-view').style.display = 'none'; document.getElementById('summary-view').style.display = 'flex';
+        }
+
+        document.getElementById('doneBtn').addEventListener('click', () => {
+            document.getElementById('summary-view').style.display = 'none'; document.getElementById('active-run-view').style.display = 'flex';
+            // 🌟 恢復按鈕狀態
+            startBtn.style.display = 'block'; 
+            pauseBtn.style.display = 'none'; 
+            stopSliderTrack.style.display = 'none';
+            startBtn.innerText = '開始跑步'; openHistoryBtn.style.display = 'block'; 
+        });
+
+        // 歷史紀錄處理
+        const historyView = document.getElementById('history-view'); const historyListContainer = document.getElementById('history-list-container');
+        document.getElementById('openHistoryBtn').addEventListener('click', () => { 
+            const history = JSON.parse(localStorage.getItem('ios_run_history') || '[]');
+            historyListContainer.innerHTML = history.length === 0 ? '<div style="color:#8e8e93; text-align:center; margin-top:50px; font-size:16px;">尚無紀錄<br><br>開始你的第一趟跑步吧！</div>' : history.map(run => `<div class="history-card"><div class="history-date-row">${run.date} &nbsp; ( ${run.startTime} - ${run.endTime} )</div><div class="history-grid"><div class="summary-item"><div class="summary-item-label">距離</div><div class="summary-item-value blue" style="font-size: 24px;">${run.distance} KM</div></div><div class="summary-item"><div class="summary-item-label">時間</div><div class="summary-item-value yellow" style="font-size: 24px;">${run.time}</div></div><div class="summary-item"><div class="summary-item-label">大卡</div><div class="summary-item-value orange" style="font-size: 16px;">${run.calories || 0}</div></div><div class="summary-item"><div class="summary-item-label">配速</div><div class="summary-item-value" style="font-size: 16px;">${run.pace} /KM</div></div></div></div>`).join('');
+            document.getElementById('active-run-view').style.display = 'none'; historyView.style.display = 'flex'; 
+        });
+        document.getElementById('closeHistoryBtn').addEventListener('click', () => { historyView.style.display = 'none'; document.getElementById('active-run-view').style.display = 'flex'; });
+
+        window.onload = initMap;
+    </script>
+</body>
+</html>
