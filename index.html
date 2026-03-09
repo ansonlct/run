@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Apple Fitness 輔助追蹤器 (LiveTrack 連線版)</title>
+    <title>Apple Fitness 輔助追蹤器 (LiveTrack 最終修復版)</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
     <style>
+        /* 樣式保持不變，維持霸氣 HUD 大字體 */
         body { margin: 0; padding: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; background-color: #000000; color: #ffffff; }
         
         #active-run-view { display: flex; flex-direction: column; height: 100%; width: 100%; }
@@ -17,16 +18,13 @@
         .app-title { font-size: 22px; font-weight: 800; color: white; cursor: pointer; user-select: none; -webkit-user-select: none; letter-spacing: 0.5px; }
         #openHistoryBtn { color: #32ade6; font-size: 16px; font-weight: 600; cursor: pointer; }
 
-        /* 🌟 直播連結分享小丸子 (HUD 頂部) */
         #liveSharePill { position: absolute; top: 65px; left: 50%; transform: translateX(-50%); background-color: rgba(50, 215, 203, 0.9); color: black; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 800; z-index: 1500; display: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5); cursor: pointer; backdrop-filter: blur(5px); }
         #viewerBadge { position: absolute; top: 65px; left: 50%; transform: translateX(-50%); background-color: #ff3b30; color: white; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 800; z-index: 1500; display: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
 
-        /* 地圖卡片區塊 */
         #map-container { position: relative; height: 42vh; margin: 15px 15px 5px 15px; border-radius: 20px; overflow: hidden; background-color: #1c1c1e; }
         #map { width: 100%; height: 100%; }
         #centerMapBtn { position: absolute; top: 15px; right: 15px; z-index: 1000; background-color: rgba(28, 28, 30, 0.8); backdrop-filter: blur(5px); border-radius: 50%; width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; color: #32ade6; font-size: 20px; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); display: none; }
 
-        /* HUD 疊加層 */
         .map-overlay-left { position: absolute; bottom: 15px; left: 15px; z-index: 1000; font-size: 48px; font-weight: 800; text-shadow: 0 2px 8px rgba(0,0,0,0.9), 0 0 15px rgba(0,0,0,0.6); pointer-events: none; color: #ffe620; font-variant-numeric: tabular-nums; line-height: 1; }
         .map-overlay-right { position: absolute; bottom: 12px; right: 15px; z-index: 1000; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; pointer-events: none; text-shadow: 0 2px 8px rgba(0,0,0,0.9), 0 0 15px rgba(0,0,0,0.6); }
         .hud-stat { display: flex; align-items: baseline; gap: 10px; justify-content: flex-end; width: 100%; }
@@ -35,7 +33,6 @@
         .hud-val-dist { display: flex; align-items: baseline; justify-content: flex-end; font-size: 56px; font-weight: 800; color: #32ade6; font-variant-numeric: tabular-nums; line-height: 1; margin-top: 8px; text-shadow: 0 2px 8px rgba(0,0,0,0.9), 0 0 15px rgba(0,0,0,0.6); }
         .hud-val-dist span:last-child { font-size: 36px; margin-left: 4px; font-weight: 800; color: #32ade6; }
 
-        /* 數據與圖表區塊 */
         .fitness-section { padding: 10px 20px; border-bottom: 1px solid #1c1c1e; }
         .section-header { margin-bottom: 5px; }
         .section-title { font-size: 16px; font-weight: 700; margin-bottom: 2px; }
@@ -66,10 +63,8 @@
         .gps-pulse { width: 20px; height: 20px; border-radius: 50%; position: absolute; top: 0; left: 0; background-color: rgba(10, 132, 255, 0.4); animation: gps-pulse-animation 2s ease-out infinite; }
         @keyframes gps-pulse-animation { 0% { transform: scale(0.6); opacity: 1; } 100% { transform: scale(2.8); opacity: 0; } }
         
-        /* 觀眾模式專用大頭針 */
         .viewer-dot { width: 16px; height: 16px; background-color: #34c759; border: 3px solid white; border-radius: 50%; position: absolute; top: 2px; left: 2px; box-shadow: 0 0 8px rgba(0,0,0,0.8); z-index: 10; }
 
-        /* 總結與歷史畫面省略... (保持原樣) */
         .summary-title { font-size: 28px; font-weight: 800; text-align: center; margin-top: 20px; margin-bottom: 5px; }
         .summary-date { text-align: center; color: #8e8e93; font-size: 16px; margin-bottom: 20px; font-weight: 600;}
         .summary-card, .history-card { background-color: #1c1c1e; border-radius: 16px; padding: 20px; margin-bottom: 15px; position: relative; overflow: hidden; }
@@ -101,12 +96,9 @@
         <div id="map-container">
             <div id="map"></div>
             <div id="centerMapBtn">⌖</div>
-            
             <div id="liveSharePill">📡 點擊複製 LiveTrack 連結</div>
             <div id="viewerBadge">🔴 即時觀看模式</div>
-            
             <div class="map-overlay-left" id="val-time">00:00.00</div>
-            
             <div class="map-overlay-right">
                 <div class="hud-stat"><span class="hud-label">即時配速</span><span class="hud-val" id="val-current-pace" style="color:#32d7cb;">--:--</span></div>
                 <div class="hud-stat"><span class="hud-label">平均配速</span><span class="hud-val" id="val-pace" style="color:white;">--:--</span></div>
@@ -139,25 +131,23 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getDatabase, ref, set, onValue, push, onChildAdded } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
 
-        // 🌟 你的 Firebase 設定碼 (已補上 databaseURL)
+    <script>
+        // 🌟 Firebase 初始化
         const firebaseConfig = {
             apiKey: "AIzaSyAq99oJLPrCBHsY4k43CIDvaXAE6KJhpIA",
             authDomain: "runlivetracker-f72c2.firebaseapp.com",
-            databaseURL: "https://runlivetracker-f72c2-default-rtdb.firebaseio.com", 
+            databaseURL: "https://runlivetracker-f72c2-default-rtdb.firebaseio.com",
             projectId: "runlivetracker-f72c2",
             storageBucket: "runlivetracker-f72c2.firebasestorage.app",
             messagingSenderId: "221596002487",
             appId: "1:221596002487:web:cfbc675c9e2545828a8532"
         };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
 
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
-
-        // --- 全域變數 ---
         let map, marker, pathLine, watchId = null, timerInterval = null;
         let pathCoordinates = [], totalDistance = 0, totalElevationGain = 0, lastAltitude = null, totalCalories = 0;
         let isPaused = false, accumulatedTime = 0, currentStartTime = null;
@@ -167,12 +157,10 @@
         let isDevMode = false, devSimInterval = null, devLat = 25.033964, devLng = 121.564468, devAlt = 10;
         let wakeLock = null, isMapFollowing = true; 
 
-        // LiveTrack 變數
         let currentRoomId = null;
         const urlParams = new URLSearchParams(window.location.search);
-        const watchRoomId = urlParams.get('watch'); // 檢查網址是否有 ?watch=XXXX
+        const watchRoomId = urlParams.get('watch'); 
 
-        // DOM 元素
         const domDist = document.getElementById('val-dist');
         const domTime = document.getElementById('val-time');
         const domPace = document.getElementById('val-pace');
@@ -182,45 +170,62 @@
         const centerMapBtn = document.getElementById('centerMapBtn');
         const liveSharePill = document.getElementById('liveSharePill');
         const viewerBadge = document.getElementById('viewerBadge');
-
         const modernGpsIcon = L.divIcon({ className: 'gps-indicator-wrapper', html: '<div class="gps-pulse"></div><div class="gps-dot"></div>', iconSize: [20, 20], iconAnchor: [10, 10] });
-        // 觀眾端專用圖示 (無脈衝光圈，純綠點)
         const viewerGpsIcon = L.divIcon({ className: 'gps-indicator-wrapper', html: '<div class="viewer-dot"></div>', iconSize: [20, 20], iconAnchor: [10, 10] });
 
-        // --- 初始化邏輯 ---
+        // 開發者模式啟動按鈕
+        let titleClickCount = 0; let titleClickTimer = null;
+        document.getElementById('appTitle').addEventListener('click', () => {
+            titleClickCount++; clearTimeout(titleClickTimer); titleClickTimer = setTimeout(() => { titleClickCount = 0; }, 1000);
+            if (titleClickCount === 3) {
+                if (prompt("請輸入密碼:") === "1234") { isDevMode = true; document.getElementById('appTitle').innerText = "輔助追蹤 (DEV)"; document.getElementById('appTitle').style.color = "#ff3b30"; alert("開發者模式已啟動！"); }
+                titleClickCount = 0;
+            }
+        });
+
         function initApp() {
             initMap();
-            
-            if (watchRoomId) {
-                // 🕵️‍♂️ 觀眾模式啟動
-                initViewerMode(watchRoomId);
-            } else {
-                // 🏃‍♂️ 跑者模式啟動 (綁定按鈕事件)
+            if (watchRoomId) initViewerMode(watchRoomId);
+            else {
                 bindRunnerEvents();
-                if (navigator.geolocation) navigator.geolocation.getCurrentPosition(pos => { 
-                    devLat=pos.coords.latitude; devLng=pos.coords.longitude; 
-                    map.setView([devLat, devLng], 17); 
-                    marker = L.marker([devLat, devLng], {icon: modernGpsIcon}).addTo(map); 
-                }, err => {}, { enableHighAccuracy: true, timeout: 10000 });
+                if (navigator.geolocation) navigator.geolocation.getCurrentPosition(pos => { devLat=pos.coords.latitude; devLng=pos.coords.longitude; map.setView([devLat, devLng], 17); marker = L.marker([devLat, devLng], {icon: modernGpsIcon}).addTo(map); }, err => {}, { enableHighAccuracy: true, timeout: 10000 });
             }
+        }
+
+        const verticalCrosshairPlugin = {
+            id: 'verticalCrosshair',
+            afterDraw: (chart) => {
+                if (chart.tooltip?._active?.length) {
+                    const ctx = chart.ctx; const x = chart.tooltip._active[0].element.x;
+                    ctx.save(); ctx.beginPath(); ctx.moveTo(x, chart.scales.y.top); ctx.lineTo(x, chart.scales.y.bottom); ctx.lineWidth = 1; ctx.strokeStyle = '#32d7cb'; ctx.stroke(); ctx.restore();
+                }
+            }
+        };
+
+        function initChart() {
+            const ctx = document.getElementById('paceChart').getContext('2d');
+            Chart.defaults.color = '#8e8e93'; Chart.defaults.font.family = 'system-ui, -apple-system, "SF Pro Display", sans-serif';
+            paceChart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: Array.from({length: 50}, (_, i) => ((i+1)*0.1).toFixed(1)), datasets: [{ label: '時速', data: [], backgroundColor: '#32d7cb', borderRadius: 2, barThickness: 3 }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false, animation: { duration: 0 }, interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { display: false }, tooltip: { enabled: true, backgroundColor: '#32d7cb', titleColor: '#000', bodyColor: '#000', titleFont: { size: 12, weight: '600' }, bodyFont: { size: 16, weight: 'bold' }, padding: 8, caretSize: 0, displayColors: false, callbacks: { title: () => 'Pace', label: (c) => c.parsed.y ? `${Math.floor(Math.round(3600 / c.parsed.y)/60)}'${(Math.round(3600 / c.parsed.y)%60).toString().padStart(2,'0')}"/KM` : '' } } },
+                    scales: { x: { grid: { display: false, drawBorder: false }, ticks: { maxTicksLimit: 60, autoSkip: false, font: { size: 10, weight: 'bold' }, callback: function(val, idx) { let dist = Math.round((idx + 1) * 1) / 10; if (Number.isInteger(dist)) return dist + 'k'; return ''; } } }, y: { display: false, beginAtZero: true } }
+                }, plugins: [verticalCrosshairPlugin]
+            });
         }
 
         function initMap() {
             map = L.map('map', {zoomControl: false, attributionControl: false}).setView([devLat, devLng], 15);
             L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
-            // 如果是觀眾，軌跡變綠色；跑者則是原本的 iOS 藍
             pathLine = L.polyline([], {color: watchRoomId ? '#34c759' : '#0a84ff', weight: 5, opacity: 0.9}).addTo(map);
-            
-            if(!watchRoomId) initChart(); // 觀眾不渲染圖表
-
+            if(!watchRoomId) initChart(); 
             map.on('dragstart', () => { isMapFollowing = false; centerMapBtn.style.display = 'flex'; });
-            centerMapBtn.addEventListener('click', () => { 
-                isMapFollowing = true; centerMapBtn.style.display = 'none'; 
-                if (pathCoordinates.length > 0) map.panTo(pathCoordinates[pathCoordinates.length - 1]); 
-            });
+            centerMapBtn.addEventListener('click', () => { isMapFollowing = true; centerMapBtn.style.display = 'none'; if (pathCoordinates.length > 0) map.panTo(pathCoordinates[pathCoordinates.length - 1]); });
         }
 
-        // ================= 🕵️‍♂️ 觀眾模式邏輯 =================
+        // ================= 🕵️‍♂️ 觀眾模式 =================
         function initViewerMode(roomId) {
             document.getElementById('appTitle').innerText = "Live 追蹤中";
             document.getElementById('controls').style.display = 'none';
@@ -228,128 +233,122 @@
             document.getElementById('split-section').style.display = 'none';
             document.getElementById('openHistoryBtn').style.display = 'none';
             
-            viewerBadge.style.display = 'block';
-            viewerBadge.innerText = `🔴 觀看中: ${roomId}`;
+            viewerBadge.style.display = 'block'; viewerBadge.innerText = `🔴 觀看中: ${roomId}`;
 
-            // 1. 監聽跑者的狀態 (數字儀表板)
-            onValue(ref(db, `rooms/${roomId}/status`), (snapshot) => {
+            // 🌟 監聽 Firebase 資料
+            db.ref(`rooms/${roomId}/status`).on('value', (snapshot) => {
                 const data = snapshot.val();
                 if (data) {
-                    domDist.innerText = data.dist || "0.00";
-                    domTime.innerText = data.time || "00:00.00";
-                    domPace.innerText = data.pace || "--:--";
-                    domCurrentPace.innerText = data.cPace || "--:--";
-                    domCal.innerText = data.cal || "0";
-                    
-                    // 更新觀眾端的地圖標記
+                    domDist.innerText = data.dist || "0.00"; domTime.innerText = data.time || "00:00.00";
+                    domPace.innerText = data.pace || "--:--"; domCurrentPace.innerText = data.cPace || "--:--"; domCal.innerText = data.cal || "0";
                     if (data.lat && data.lng) {
-                        if (!marker) marker = L.marker([data.lat, data.lng], {icon: viewerGpsIcon}).addTo(map);
-                        else marker.setLatLng([data.lat, data.lng]);
+                        if (!marker) marker = L.marker([data.lat, data.lng], {icon: viewerGpsIcon}).addTo(map); else marker.setLatLng([data.lat, data.lng]);
                         if (isMapFollowing) map.panTo([data.lat, data.lng]);
                     }
                 }
             });
 
-            // 2. 監聽跑者的軌跡 (畫線)
-            onChildAdded(ref(db, `rooms/${roomId}/route`), (snapshot) => {
+            db.ref(`rooms/${roomId}/route`).on('child_added', (snapshot) => {
                 const pt = snapshot.val();
-                if(pt && pt.lat && pt.lng) {
-                    pathCoordinates.push([pt.lat, pt.lng]);
-                    pathLine.setLatLngs(pathCoordinates);
-                }
+                if(pt && pt.lat && pt.lng) { pathCoordinates.push([pt.lat, pt.lng]); pathLine.setLatLngs(pathCoordinates); }
             });
         }
 
-        // ================= 🏃‍♂️ 跑者模式邏輯 =================
+        // ================= 🏃‍♂️ 跑者模式 =================
         function bindRunnerEvents() {
-            const startBtn = document.getElementById('startBtn');
-            const pauseBtn = document.getElementById('pauseBtn');
-            const stopSliderTrack = document.getElementById('stopSliderTrack');
-
-            // 產生隨機房間 ID
+            const startBtn = document.getElementById('startBtn'); const pauseBtn = document.getElementById('pauseBtn'); const stopSliderTrack = document.getElementById('stopSliderTrack');
             function generateRoomId() { return Math.random().toString(36).substring(2, 6).toUpperCase(); }
 
-            // 點擊複製連結
             liveSharePill.addEventListener('click', () => {
                 const shareUrl = `${window.location.origin}${window.location.pathname}?watch=${currentRoomId}`;
-                navigator.clipboard.writeText(shareUrl).then(() => {
-                    liveSharePill.innerText = "✅ 連結已複製！傳給朋友吧";
-                    setTimeout(() => liveSharePill.innerText = `📡 Live ID: ${currentRoomId} (點擊複製)`, 3000);
-                });
+                navigator.clipboard.writeText(shareUrl).then(() => { liveSharePill.innerText = "✅ 連結已複製！"; setTimeout(() => liveSharePill.innerText = `📡 Live ID: ${currentRoomId} (點擊複製)`, 3000); });
             });
 
             startBtn.addEventListener('click', () => {
                 if (!isDevMode && !navigator.geolocation) return alert('不支援 GPS！');
-                requestWakeLock(); document.getElementById('openHistoryBtn').style.display = 'none'; 
+                if ('wakeLock' in navigator) navigator.wakeLock.request('screen').then(w => wakeLock = w).catch(e=>{});
+                document.getElementById('openHistoryBtn').style.display = 'none';
                 
-                // 🌟 Firebase: 建立新房間
                 currentRoomId = generateRoomId();
-                liveSharePill.style.display = 'block';
-                liveSharePill.innerText = `📡 Live ID: ${currentRoomId} (點擊複製)`;
+                liveSharePill.style.display = 'block'; liveSharePill.innerText = `📡 Live ID: ${currentRoomId} (點擊複製)`;
 
                 runStartTimeString = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
                 pathCoordinates = []; totalDistance = totalElevationGain = accumulatedTime = totalCalories = 0; lastAltitude = null; isPaused = false;
+                nextKmMarker = 1; lastKmSplitSeconds = 0; lastKmDistance = 0; document.getElementById('split-header-ui').style.display = 'none'; document.getElementById('splits-list').innerHTML = '<div id="split-placeholder" style="color: #8e8e93; font-size: 13px; font-weight: 500; text-align: center; margin-top: 10px;">跑到 1km 後顯示分段紀錄</div>'; 
+                recentPointsForPace = []; domCurrentPace.innerText = '--:--'; lastChartDistance = 0; lastChartSeconds = 0; document.getElementById('chart-inner').style.width = '100%'; document.getElementById('chart-scroll-wrapper').scrollLeft = 0;
+                paceChart.data.labels = Array.from({length: 50}, (_, i) => ((i+1)*0.1).toFixed(1)); paceChart.data.datasets[0].data = []; paceChart.update();
+                currentStartTime = Date.now(); domDist.innerText = '0.00'; domTime.innerText = '00:00.00'; domPace.innerText = '--:--'; domElev.innerText = '0m'; domCal.innerText = '0'; if (pathLine) pathLine.setLatLngs([]);
                 
-                currentStartTime = Date.now();
-                startBtn.style.display = 'none'; pauseBtn.style.display = 'block'; stopSliderTrack.style.display = 'flex';
-                pauseBtn.innerText = '暫停'; pauseBtn.style.backgroundColor = '#ff9500';
-                
+                startBtn.style.display = 'none'; pauseBtn.style.display = 'block'; stopSliderTrack.style.display = 'flex'; pauseBtn.innerText = '暫停'; pauseBtn.style.backgroundColor = '#ff9500';
                 timerInterval = setInterval(updateTimerAndPace, 30);
 
                 if (isDevMode) {
                     devSimInterval = setInterval(() => {
-                        if (isPaused) return;
-                        devLat += 0.000025 + (Math.random() - 0.5)*0.00001; devLng += 0.000025 + (Math.random() - 0.5)*0.00001;
+                        if (isPaused) return; devLat += 0.000025 + (Math.random() - 0.5)*0.00001; devLng += 0.000025 + (Math.random() - 0.5)*0.00001;
                         successLocation({ coords: { latitude: devLat, longitude: devLng, altitude: 10, accuracy: 5 } });
                     }, 1000);
-                } else {
-                    watchId = navigator.geolocation.watchPosition(successLocation, err=>{}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
-                }
+                } else { watchId = navigator.geolocation.watchPosition(successLocation, err=>{}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }); }
             });
 
-            // ... (其餘暫停、結束拉桿、圖表邏輯等皆與上一版相同，為了篇幅精簡，直接接續核心更新)
-            
-            const handle = document.getElementById('stopSliderHandle'); const track = document.getElementById('stopSliderTrack'); const sliderText = document.getElementById('stopSliderText');
-            let isDragging = false; let startX = 0; let currentX = 0;
-            handle.addEventListener('pointerdown', (e) => { isDragging = true; startX = e.clientX - currentX; handle.style.transition = 'none'; });
-            window.addEventListener('pointermove', (e) => {
-                if (!isDragging) return; currentX = e.clientX - startX; let maxDrag = track.clientWidth - handle.clientWidth - 8;
-                if (currentX < 0) currentX = 0; if (currentX > maxDrag) currentX = maxDrag;
-                handle.style.transform = `translateX(${currentX}px)`; sliderText.style.opacity = 1 - (currentX / maxDrag); 
-            });
-            window.addEventListener('pointerup', () => {
-                if (!isDragging) return; isDragging = false; let maxDrag = track.clientWidth - handle.clientWidth - 8;
-                if (currentX > maxDrag * 0.85) { handle.style.transform = `translateX(${maxDrag}px)`; triggerStop(); setTimeout(()=>{isDragging=false;currentX=0;handle.style.transition='transform 0.3s';handle.style.transform='translateX(0)';sliderText.style.opacity=1;}, 300); } 
-                else { isDragging=false;currentX=0;handle.style.transition='transform 0.3s';handle.style.transform='translateX(0)';sliderText.style.opacity=1; }
-            });
-            window.addEventListener('pointercancel', () => { if(isDragging){isDragging=false;currentX=0;handle.style.transition='transform 0.3s';handle.style.transform='translateX(0)';sliderText.style.opacity=1;} });
-            
             pauseBtn.addEventListener('click', () => {
-                if (!isPaused) { isPaused = true; accumulatedTime += (Date.now() - currentStartTime); pauseBtn.innerText = '繼續'; pauseBtn.style.backgroundColor = '#34c759'; releaseWakeLock(); } 
-                else { isPaused = false; currentStartTime = Date.now(); recentPointsForPace = []; pauseBtn.innerText = '暫停'; pauseBtn.style.backgroundColor = '#ff9500'; requestWakeLock(); }
+                if (!isPaused) { isPaused = true; accumulatedTime += (Date.now() - currentStartTime); pauseBtn.innerText = '繼續'; pauseBtn.style.backgroundColor = '#34c759'; if (wakeLock) wakeLock.release().then(()=>wakeLock=null); } 
+                else { isPaused = false; currentStartTime = Date.now(); recentPointsForPace = []; pauseBtn.innerText = '暫停'; pauseBtn.style.backgroundColor = '#ff9500'; if ('wakeLock' in navigator) navigator.wakeLock.request('screen').then(w=>wakeLock=w).catch(e=>{}); }
             });
         }
 
-        // --- 共用計算與更新 ---
+        const handle = document.getElementById('stopSliderHandle'); const track = document.getElementById('stopSliderTrack'); const sliderText = document.getElementById('stopSliderText');
+        let isDragging = false; let startX = 0; let currentX = 0;
+        handle.addEventListener('pointerdown', (e) => { isDragging = true; startX = e.clientX - currentX; handle.style.transition = 'none'; });
+        window.addEventListener('pointermove', (e) => {
+            if (!isDragging) return; currentX = e.clientX - startX; let maxDrag = track.clientWidth - handle.clientWidth - 8;
+            if (currentX < 0) currentX = 0; if (currentX > maxDrag) currentX = maxDrag;
+            handle.style.transform = `translateX(${currentX}px)`; sliderText.style.opacity = 1 - (currentX / maxDrag); 
+        });
+        window.addEventListener('pointerup', () => {
+            if (!isDragging) return; isDragging = false; let maxDrag = track.clientWidth - handle.clientWidth - 8;
+            if (currentX > maxDrag * 0.85) { handle.style.transform = `translateX(${maxDrag}px)`; triggerStop(); setTimeout(()=>{isDragging=false;currentX=0;handle.style.transition='transform 0.3s ease-out';handle.style.transform='translateX(0)';sliderText.style.opacity=1;},300); } 
+            else { isDragging=false;currentX=0;handle.style.transition='transform 0.3s ease-out';handle.style.transform='translateX(0)';sliderText.style.opacity=1; }
+        });
+        window.addEventListener('pointercancel', () => { if(isDragging){isDragging=false;currentX=0;handle.style.transition='transform 0.3s ease-out';handle.style.transform='translateX(0)';sliderText.style.opacity=1;} });
+
         function calculateDistance(lat1, lon1, lat2, lon2) { const R = 6371; const dLat = (lat2 - lat1) * Math.PI / 180; const dLon = (lon2 - lon1) * Math.PI / 180; const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2); return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); }
         function formatTime(totalSeconds) { const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0'); const s = (totalSeconds % 60).toString().padStart(2, '0'); return `${m}:${s}`; }
         function formatTimeWithMs(totalMs) { const totalSeconds = Math.floor(totalMs / 1000); const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0'); const s = (totalSeconds % 60).toString().padStart(2, '0'); const cs = Math.floor((totalMs % 1000) / 10).toString().padStart(2, '0'); return `${m}:${s}.${cs}`; }
         function getElapsedTime() { return (!currentStartTime || isPaused) ? accumulatedTime : accumulatedTime + (Date.now() - currentStartTime); }
 
-        // 🌟 更新儀表板時，同步發送狀態給 Firebase 觀眾
         function updateTimerAndPace() {
             const totalMs = getElapsedTime(); domTime.innerText = formatTimeWithMs(totalMs);
             if (totalDistance > 0) domPace.innerText = formatTime(Math.floor(Math.floor(totalMs / 1000) / totalDistance));
             
-            // 每秒只上傳一次狀態，避免 Firebase 流量爆炸
+            // 🌟 寫入 Firebase (每秒更新一次減少頻寬)
             if (currentRoomId && !watchRoomId && (totalMs % 1000 < 50)) {
-                set(ref(db, `rooms/${currentRoomId}/status`), {
-                    time: domTime.innerText,
-                    dist: domDist.innerText,
-                    pace: domPace.innerText,
-                    cPace: domCurrentPace.innerText,
-                    cal: domCal.innerText
-                });
+                db.ref(`rooms/${currentRoomId}/status`).set({ time: domTime.innerText, dist: domDist.innerText, pace: domPace.innerText, cPace: domCurrentPace.innerText, cal: domCal.innerText });
+            }
+        }
+
+        function checkAndRecordSplit(elapsedSeconds) {
+            if (totalDistance >= nextKmMarker) {
+                if(nextKmMarker === 1) { document.getElementById('split-header-ui').style.display = 'grid'; if(document.getElementById('split-placeholder')) document.getElementById('split-placeholder').style.display = 'none'; }
+                const splitTimeSeconds = elapsedSeconds - lastKmSplitSeconds; const splitPaceSeconds = Math.floor(splitTimeSeconds / (totalDistance - lastKmDistance)); const avgPaceSeconds = Math.floor(elapsedSeconds / totalDistance);
+                const splitRow = document.createElement('div'); splitRow.className = 'split-grid split-row';
+                splitRow.innerHTML = `<span>${nextKmMarker}</span><span>${formatTime(splitPaceSeconds)} /KM</span><span>${formatTime(avgPaceSeconds)}</span><span>${formatTime(elapsedSeconds)}</span>`;
+                document.getElementById('splits-list').prepend(splitRow);
+                nextKmMarker++; lastKmSplitSeconds = elapsedSeconds; lastKmDistance = totalDistance;
+            }
+        }
+
+        function updateChartData(elapsedSeconds) {
+            if (totalDistance - lastChartDistance >= 0.1) {
+                let chartPaceSecs = Math.floor((elapsedSeconds - lastChartSeconds) / (totalDistance - lastChartDistance));
+                if (chartPaceSecs > 1800) chartPaceSecs = 1800; if (chartPaceSecs < 120) chartPaceSecs = 120;
+                if (paceChart.data.datasets[0].data.length >= paceChart.data.labels.length) {
+                    paceChart.data.labels.push((totalDistance).toFixed(1));
+                    const currentPoints = paceChart.data.labels.length;
+                    if (currentPoints > 50) document.getElementById('chart-inner').style.width = (currentPoints / 50 * 100) + '%';
+                }
+                paceChart.data.datasets[0].data.push(3600 / chartPaceSecs); paceChart.update();
+                setTimeout(() => { const scrollWrapper = document.getElementById('chart-scroll-wrapper'); scrollWrapper.scrollLeft = scrollWrapper.scrollWidth; }, 50);
+                lastChartDistance = totalDistance; lastChartSeconds = elapsedSeconds;
             }
         }
 
@@ -381,15 +380,18 @@
                     totalCalories = Math.round(65 * totalDistance * 1.036);
                     domDist.innerText = totalDistance.toFixed(2); domCal.innerText = totalCalories;
                     
-                    // 🌟 Firebase: 將新的經緯度座標推送到雲端
+                    // 🌟 寫入 Firebase (推送軌跡點)
                     if (currentRoomId && !watchRoomId) {
-                        push(ref(db, `rooms/${currentRoomId}/route`), { lat: lat, lng: lng });
-                        // 同時更新狀態確保觀眾的位置標記能平滑移動
-                        set(ref(db, `rooms/${currentRoomId}/status`), {
-                            lat: lat, lng: lng, time: domTime.innerText, dist: domDist.innerText, pace: domPace.innerText, cPace: domCurrentPace.innerText, cal: domCal.innerText
-                        });
+                        db.ref(`rooms/${currentRoomId}/route`).push({ lat: lat, lng: lng });
+                        db.ref(`rooms/${currentRoomId}/status`).set({ lat: lat, lng: lng, time: domTime.innerText, dist: domDist.innerText, pace: domPace.innerText, cPace: domCurrentPace.innerText, cal: domCal.innerText });
                     }
+                    
+                    checkAndRecordSplit(elapsedSeconds); updateChartData(elapsedSeconds);     
                 }
+            }
+            if (altitude !== null) {
+                if (lastAltitude !== null) { const elevDiff = altitude - lastAltitude; if (elevDiff > 1) { totalElevationGain += elevDiff; domElev.innerText = Math.round(totalElevationGain) + 'm'; } }
+                lastAltitude = altitude;
             }
             pathCoordinates.push([lat, lng]); pathLine.setLatLngs(pathCoordinates);
         }
@@ -399,19 +401,43 @@
             if (devSimInterval !== null) { clearInterval(devSimInterval); devSimInterval = null; } 
             if (timerInterval !== null) clearInterval(timerInterval);
             watchId = timerInterval = null; isPaused = false;
-            releaseWakeLock(); liveSharePill.style.display = 'none';
+            if (wakeLock) wakeLock.release().then(()=>wakeLock=null); centerMapBtn.style.display = 'none';
+            liveSharePill.style.display = 'none';
 
-            // 🌟 跑完後，通知 Firebase 房間已結束 (可選: 清除資料節省空間)
-            if (currentRoomId) {
-                set(ref(db, `rooms/${currentRoomId}/status/time`), "已結束");
+            if (currentRoomId) db.ref(`rooms/${currentRoomId}/status/time`).set("已結束");
+
+            runEndTimeString = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+            const finalDist = totalDistance.toFixed(2); const finalTime = formatTimeWithMs(getElapsedTime()).slice(0, 5); const finalAvgPace = domPace.innerText;
+            const savedRoute = pathCoordinates.length <= 150 ? pathCoordinates : pathCoordinates.filter((_, index) => index % Math.ceil(pathCoordinates.length / 150) === 0);
+
+            if (totalDistance > 0 || isDevMode) { 
+                let history = JSON.parse(localStorage.getItem('ios_run_history') || '[]');
+                history.unshift({ id: Date.now(), date: new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' }), startTime: runStartTimeString, endTime: runEndTimeString, distance: finalDist, time: finalTime, pace: finalAvgPace, elevation: Math.round(totalElevationGain), calories: totalCalories, route: savedRoute });
+                localStorage.setItem('ios_run_history', JSON.stringify(history));
             }
 
+            document.getElementById('sum-date').innerText = new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' }); document.getElementById('sum-dist').innerText = `${finalDist} KM`; document.getElementById('sum-time').innerText = domTime.innerText; document.getElementById('sum-pace').innerText = `${finalAvgPace} /KM`; document.getElementById('sum-elev').innerText = `${Math.round(totalElevationGain)} m`; document.getElementById('sum-cal').innerText = `${totalCalories} KCAL`; document.getElementById('sum-start-time').innerText = runStartTimeString; document.getElementById('sum-end-time').innerText = runEndTimeString;
             document.getElementById('active-run-view').style.display = 'none'; document.getElementById('summary-view').style.display = 'flex';
+            
+            if (!summaryMapInstance) { summaryMapInstance = L.map('summary-map', {zoomControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, attributionControl: false}).setView([25.033, 121.564], 15); L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(summaryMapInstance); summaryPathLayer = L.polyline([], {color: '#34c759', weight: 4, opacity: 1}).addTo(summaryMapInstance); }
+            if (savedRoute && savedRoute.length > 0) { summaryPathLayer.setLatLngs(savedRoute); summaryMapInstance.fitBounds(summaryPathLayer.getBounds(), {padding: [15, 15]}); }
+            setTimeout(() => summaryMapInstance.invalidateSize(), 100);
         }
 
-        document.getElementById('doneBtn').addEventListener('click', () => { window.location.reload(); }); // 跑完直接重整最乾淨
+        document.getElementById('doneBtn').addEventListener('click', () => { window.location.reload(); });
 
-        // 啟動
+        document.getElementById('openHistoryBtn').addEventListener('click', () => { 
+            historyMapInstances.forEach(m => m.remove()); historyMapInstances = [];
+            const history = JSON.parse(localStorage.getItem('ios_run_history') || '[]');
+            if (history.length === 0) { document.getElementById('history-list-container').innerHTML = '<div style="color:#8e8e93; text-align:center; margin-top:50px; font-size:16px;">尚無紀錄<br><br>開始你的第一趟跑步吧！</div>'; }
+            else {
+                document.getElementById('history-list-container').innerHTML = history.map(run => `<div class="history-card"><div class="history-date-row">${run.date} &nbsp; ( ${run.startTime} - ${run.endTime} )</div><div id="hist-map-${run.id}" class="hist-map"></div><div class="history-grid"><div class="summary-item"><div class="summary-item-label">距離</div><div class="summary-item-value blue" style="font-size: 26px;">${run.distance} KM</div></div><div class="summary-item"><div class="summary-item-label">時間</div><div class="summary-item-value yellow" style="font-size: 26px;">${run.time}</div></div><div class="summary-item"><div class="summary-item-label">大卡</div><div class="summary-item-value orange" style="font-size: 18px;">${run.calories || 0}</div></div><div class="summary-item"><div class="summary-item-label">配速</div><div class="summary-item-value" style="font-size: 18px;">${run.pace} /KM</div></div></div></div>`).join('');
+                setTimeout(() => { history.forEach(run => { const mapId = `hist-map-${run.id}`; if (document.getElementById(mapId) && run.route && run.route.length > 0) { const m = L.map(mapId, {zoomControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, attributionControl: false}); L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(m); const pl = L.polyline(run.route, {color: '#34c759', weight: 3}).addTo(m); m.fitBounds(pl.getBounds(), {padding: [10, 10]}); historyMapInstances.push(m); } else if (document.getElementById(mapId)) document.getElementById(mapId).style.display = 'none'; }); }, 100); 
+            }
+            document.getElementById('active-run-view').style.display = 'none'; document.getElementById('history-view').style.display = 'flex'; 
+        });
+        document.getElementById('closeHistoryBtn').addEventListener('click', () => { document.getElementById('history-view').style.display = 'none'; document.getElementById('active-run-view').style.display = 'flex'; });
+
         window.onload = initApp;
     </script>
 </body>
